@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState } from 'react';
 import Notiflix from 'notiflix';
 import { SearchBar } from './search-bar/searchBar';
 import { ImageGalery } from './image-galery/imageGallery';
@@ -6,81 +6,66 @@ import { Loader } from './laoder';
 import { Button } from './button-more/button';
 import { Div } from './App.styled';
 import { imageFind } from './appi';
+import { useEffect } from 'react';
 
-class App extends Component {
-  state = {
-    images: [],
-    query: '',
-    page: 1,
-    isLader: false,
+export const App = () => {
+  const [images, setImages] = useState([]);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadMore, setLoadMore] = useState('');
+
+  const handelQuery = event => {
+    setImages([]);
+    setQuery(`${Date.now()}/${event}`);
+    setPage(1);
   };
 
-  handelQuery = event => {
-    this.setState({
-      images: [],
-      query: `${Date.now()}/${event}`,
-      page: 1,
-      loadMore: '',
-    });
+  const handelLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  handelLoadMore = () => {
-    this.setState(prevState => {
-      return {
-        page: prevState.page + 1,
-      };
-    });
-  };
-
-  fetchImages = async () => {
-    const splitQuery = this.state.query.split(/\/(.*)/)[1].trim();
-
-    if (!splitQuery) {
-      Notiflix.Notify.warning('Please enter a what search.');
+  useEffect(() => {
+    if (!query) {
       return;
     }
-    try {
-      this.setState({ isLoading: true });
-      const { totalHits, hits } = await imageFind(splitQuery, this.state.page);
-      if (hits.length === 0) {
-        Notiflix.Notify.failure(
-          'Sorry, there are no images matching your search query. Please try again.'
-        );
+    const fetchImages = async () => {
+      const splitQuery = query.split(/\/(.*)/)[1]?.trim() || '';
 
+      if (!splitQuery) {
+        setIsLoading(false);
+        Notiflix.Notify.warning('Please enter a what search.');
         return;
       }
-      this.setState(prevState => ({
-        images: [...prevState.images, ...hits],
-        loadMore: this.state.page < Math.ceil(totalHits / 12),
-      }));
-    } catch (error) {
-      Notiflix.Notify.warning('Sorry, somesing weree wrong. Try later🙏');
-    } finally {
-      this.setState({ isLoading: false });
-    }
-  };
+      try {
+        setIsLoading(true);
+        const { totalHits, hits } = await imageFind(splitQuery, page);
+        if (hits.length === 0) {
+          Notiflix.Notify.failure(
+            'Sorry, there are no images matching your search query. Please try again.'
+          );
 
-  componentDidUpdate(prevProps, prevState) {
-    if (
-      prevState.query !== this.state.query ||
-      prevState.page !== this.state.page
-    ) {
-      this.fetchImages();
-    }
-  }
+          return;
+        }
+        setImages(prevImages => [...prevImages, ...hits]);
+        setLoadMore(page < Math.ceil(totalHits / 12));
+      } catch (error) {
+        Notiflix.Notify.warning('Sorry, somesing weree wrong. Try later🙏');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  render() {
-    const { images, isLoading, loadMore } = this.state;
-    return (
-      <Div>
-        <SearchBar onSubmit={this.handelQuery} />
+    fetchImages();
+  }, [page, query]);
 
-        <ImageGalery hits={images} />
-        {isLoading && <Loader />}
-        {loadMore && <Button onClick={this.handelLoadMore} />}
-      </Div>
-    );
-  }
-}
+  return (
+    <Div>
+      <SearchBar onSubmit={handelQuery} />
 
-export default App;
+      <ImageGalery hits={images} />
+      {isLoading && <Loader />}
+      {loadMore && <Button onClick={handelLoadMore} />}
+    </Div>
+  );
+};
